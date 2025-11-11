@@ -138,6 +138,26 @@ The following OpenAI voice names are automatically mapped to Kokoro voices:
 - `nova` → `af_nova`
 - `shimmer` → `af_sky`
 
+### Testing the API
+
+We provide several ways to test the OpenAI-compatible endpoint:
+
+**Option 1: Web Interface**
+Open `test_openai_endpoint.html` in your browser to test the API endpoint with a user-friendly interface.
+
+**Option 2: Python Test Script**
+```bash
+python3 test_api.py
+# Or with custom endpoint and API key:
+python3 test_api.py http://your-server:8000 your-api-key
+```
+
+**Option 3: OpenAI Python Client Examples**
+```bash
+pip install openai
+python3 example_openai_client.py
+```
+
 ---
 
 ## 📌 Notes
