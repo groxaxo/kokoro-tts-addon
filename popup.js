@@ -10,6 +10,9 @@ const voiceSelect = document.getElementById('voiceSelect');
 const speedInput = document.getElementById('speedInput');
 const speedValue = document.getElementById('speedValue');
 const langSelect = document.getElementById('langSelect');
+const apiEndpoint = document.getElementById('apiEndpoint');
+const apiKey = document.getElementById('apiKey');
+const useOpenAIFormat = document.getElementById('useOpenAIFormat');
 const speakBtn = document.getElementById('speakBtn');
 const stopBtn = document.getElementById('stopBtn');
 const status = document.getElementById('status');
@@ -100,9 +103,12 @@ function setupEventListeners() {
         hideAudioControls();
     });
 
-    // Auto-save settings when voice, speed, or language selection changes
-    [voiceSelect, speedInput, langSelect].forEach(element => {
+    // Auto-save settings when voice, speed, language, or API settings change
+    [voiceSelect, speedInput, langSelect, apiEndpoint, apiKey, useOpenAIFormat].forEach(element => {
         element.addEventListener('change', saveSettings);
+        if (element.type === 'text' || element.type === 'password') {
+            element.addEventListener('input', saveSettings);
+        }
     });
 
     // Auto-resize text area as user types
@@ -198,15 +204,18 @@ function cleanupAudioResources() {
 }
 
 /**
- * Loads user settings (voice, speed, language) from Firefox local storage
+ * Loads user settings (voice, speed, language, API endpoint) from Firefox local storage
  * and updates the UI elements accordingly.
  */
 async function loadSettings() {
     try {
         const result = await browser.storage.local.get({
-            voice: 'af_heart', // Default voice
-            speed: 1.0,        // Default speed
-            language: 'a'      // Default language (American English)
+            voice: 'af_heart',                    // Default voice
+            speed: 1.0,                           // Default speed
+            language: 'a',                        // Default language (American English)
+            apiEndpoint: 'http://localhost:8000', // Default endpoint
+            apiKey: '',                           // Default API key (empty)
+            useOpenAIFormat: false                // Default to Kokoro format
         });
 
         // Only set the value if the option exists, otherwise default will be used
@@ -224,6 +233,10 @@ async function loadSettings() {
         } else {
             langSelect.value = 'a'; // Fallback to a safe default if saved language is not available
         }
+        
+        apiEndpoint.value = result.apiEndpoint;
+        apiKey.value = result.apiKey;
+        useOpenAIFormat.checked = result.useOpenAIFormat;
 
     } catch (error) {
         console.error('Failed to load settings:', error);
@@ -231,14 +244,17 @@ async function loadSettings() {
 }
 
 /**
- * Saves current user settings (voice, speed, language) to Firefox local storage.
+ * Saves current user settings (voice, speed, language, API endpoint) to Firefox local storage.
  */
 async function saveSettings() {
     try {
         await browser.storage.local.set({
             voice: voiceSelect.value,
             speed: parseFloat(speedInput.value),
-            language: langSelect.value
+            language: langSelect.value,
+            apiEndpoint: apiEndpoint.value,
+            apiKey: apiKey.value,
+            useOpenAIFormat: useOpenAIFormat.checked
         });
     } catch (error) {
         console.error('Failed to save settings:', error);
@@ -326,22 +342,23 @@ async function getPageText() {
 }
 
 /**
- * Checks the status of the local Kokoro TTS server by pinging its health endpoint.
+ * Checks the status of the configured TTS server by pinging its health endpoint.
  * Also populates the voice and language dropdowns if the server is healthy.
  */
 async function checkServerStatus() {
     try {
-        const response = await fetch('http://localhost:8000/health');
+        const endpoint = apiEndpoint.value || 'http://localhost:8000';
+        const response = await fetch(`${endpoint}/health`);
         if (response.ok) {
-            showStatus('Kokoro server connected ✓', 'success');
+            showStatus('TTS server connected ✓', 'success');
             // We already populate on DOMContentLoaded, but this can serve as a re-check
             // if needed. For now, it's primarily for status message.
         } else {
-            showStatus('Kokoro server not responding', 'error');
+            showStatus('TTS server not responding', 'error');
         }
     } catch (error) {
         console.error('Error checking server status:', error);
-        showStatus('Kokoro server not running - Start local server first', 'error');
+        showStatus('TTS server not running - Check endpoint and start server', 'error');
     }
 }
 
@@ -350,7 +367,8 @@ async function checkServerStatus() {
  */
 async function populateDropdownsFromSever() {
     try {
-        const response = await fetch('http://localhost:8000/health');
+        const endpoint = apiEndpoint.value || 'http://localhost:8000';
+        const response = await fetch(`${endpoint}/health`);
         if (response.ok) {
             const data = await response.json();
 
@@ -359,20 +377,24 @@ async function populateDropdownsFromSever() {
             langSelect.innerHTML = '';
 
             // Populate Voice dropdown
-            data.available_voices.forEach(voiceCode => {
-                const option = document.createElement('option');
-                option.value = voiceCode;
-                option.textContent = VOICE_DISPLAY_NAMES[voiceCode] || voiceCode; // Use display name or code
-                voiceSelect.appendChild(option);
-            });
+            if (data.available_voices) {
+                data.available_voices.forEach(voiceCode => {
+                    const option = document.createElement('option');
+                    option.value = voiceCode;
+                    option.textContent = VOICE_DISPLAY_NAMES[voiceCode] || voiceCode; // Use display name or code
+                    voiceSelect.appendChild(option);
+                });
+            }
 
             // Populate Language dropdown
-            data.available_languages.forEach(langCode => {
-                const option = document.createElement('option');
-                option.value = langCode;
-                option.textContent = LANGUAGE_DISPLAY_NAMES[langCode] || langCode; // Use display name or code
-                langSelect.appendChild(option);
-            });
+            if (data.available_languages) {
+                data.available_languages.forEach(langCode => {
+                    const option = document.createElement('option');
+                    option.value = langCode;
+                    option.textContent = LANGUAGE_DISPLAY_NAMES[langCode] || langCode; // Use display name or code
+                    langSelect.appendChild(option);
+                });
+            }
 
         } else {
             console.error('Failed to fetch server capabilities:', response.statusText);
@@ -388,7 +410,8 @@ async function populateDropdownsFromSever() {
 }
 
 /**
- * Generates speech from the text input using the local Kokoro TTS server.
+ * Generates speech from the text input using the configured TTS server.
+ * Supports both Kokoro and OpenAI-compatible formats.
  * Plays the audio and handles UI state during generation.
  */
 async function generateSpeech() {
@@ -410,21 +433,55 @@ async function generateSpeech() {
     showStatus('Generating speech...', 'loading');
 
     try {
-        const response = await fetch('http://localhost:8000/generate', {
-            method: 'POST',
-            headers: {
+        const endpoint = apiEndpoint.value || 'http://localhost:8000';
+        const useOpenAI = useOpenAIFormat.checked;
+        
+        let url, body, headers;
+        
+        if (useOpenAI) {
+            // OpenAI-compatible format
+            url = `${endpoint}/v1/audio/speech`;
+            headers = {
                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+            };
+            
+            // Add API key if provided
+            if (apiKey.value) {
+                headers['Authorization'] = `Bearer ${apiKey.value}`;
+            }
+            
+            body = JSON.stringify({
+                model: 'kokoro',
+                voice: voiceSelect.value,
+                input: text,
+                response_format: 'wav',
+                speed: parseFloat(speedInput.value),
+                language: langSelect.value
+            });
+        } else {
+            // Original Kokoro format
+            url = `${endpoint}/generate`;
+            headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            body = JSON.stringify({
                 text: text,
                 voice: voiceSelect.value,
                 speed: parseFloat(speedInput.value),
                 language: langSelect.value
-            })
+            });
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: body
         });
 
         if (!response.ok) {
-            throw new Error(`Server error: ${response.status} - ${await response.text()}`);
+            const errorText = await response.text();
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
 
         const audioBlob = await response.blob();

@@ -14,10 +14,12 @@ import multiprocessing
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 import logging
+import base64
+import requests
 
 import torch
 import soundfile as sf
-from flask import Flask, request, jsonify, send_file, Response
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
 from kokoro import KPipeline
 
@@ -515,6 +517,156 @@ def force_cpu_mode():
     except Exception as e:
         app.logger.error(f"Error forcing CPU mode: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/v1/audio/speech', methods=['POST'])
+def openai_compatible_speech():
+    """
+    OpenAI-compatible TTS endpoint for integration with VibeVoice and other OpenAI API clients.
+    Supports both streaming and non-streaming responses.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': {'message': 'No JSON data provided', 'type': 'invalid_request_error'}}), 400
+        
+        # Extract OpenAI-compatible parameters
+        model = data.get('model', 'kokoro')
+        voice = data.get('voice', 'af_heart')
+        input_text = data.get('input', '').strip()
+        response_format = data.get('response_format', 'mp3')
+        speed = float(data.get('speed', 1.0))
+        language = data.get('language', 'a')
+        stream_format = data.get('stream_format', None)
+        
+        if not input_text:
+            return jsonify({'error': {'message': 'No input text provided', 'type': 'invalid_request_error'}}), 400
+        
+        app.logger.info(f"OpenAI-compatible endpoint: Generating speech for text (first 50 chars): '{input_text[:50]}...' "
+                        f"with voice '{voice}', speed {speed}, format '{response_format}'")
+        
+        # Map OpenAI voices to Kokoro voices if needed
+        voice_mapping = {
+            'alloy': 'af_alloy',
+            'echo': 'am_echo',
+            'fable': 'bm_fable',
+            'onyx': 'am_onyx',
+            'nova': 'af_nova',
+            'shimmer': 'af_sky'
+        }
+        
+        # Use mapped voice if it exists, otherwise use as-is
+        kokoro_voice = voice_mapping.get(voice, voice)
+        
+        # Validate voice against known mapping
+        if kokoro_voice not in VOICE_MAPPING:
+            app.logger.warning(f"Invalid voice requested: {kokoro_voice}. Falling back to default 'af_heart'.")
+            kokoro_voice = 'af_heart'
+        
+        # Get pipeline
+        pipeline = get_pipeline(language)
+        
+        # Check if streaming is requested
+        if stream_format == 'sse':
+            # Server-Sent Events streaming
+            def generate_sse():
+                try:
+                    with torch.no_grad():
+                        for i, (_, _, audio) in enumerate(
+                            pipeline(input_text, voice=kokoro_voice, speed=speed, split_pattern=r'\n+')
+                        ):
+                            if hasattr(audio, 'device') and audio.device.type != 'cpu':
+                                audio = audio.cpu()
+                            
+                            # Convert to base64-encoded PCM
+                            pcm_data = (audio.numpy() * 32767).astype('int16').tobytes()
+                            b64_data = base64.b64encode(pcm_data).decode('utf-8')
+                            
+                            # Send as SSE event
+                            yield f"data: {json.dumps({'audio': b64_data, 'index': i})}\n\n"
+                    
+                    # Send completion event
+                    yield f"data: {json.dumps({'done': True})}\n\n"
+                    
+                except Exception as e:
+                    app.logger.error(f"SSE streaming error: {e}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            
+            return Response(
+                stream_with_context(generate_sse()),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'X-Accel-Buffering': 'no'
+                }
+            )
+        else:
+            # Non-streaming response - generate full audio
+            audio_segments = []
+            
+            with torch.no_grad():
+                start_time = time.time()
+                
+                for i, (_, _, audio) in enumerate(
+                    pipeline(input_text, voice=kokoro_voice, speed=speed, split_pattern=r'\n+')
+                ):
+                    if hasattr(audio, 'device') and audio.device.type != 'cpu':
+                        audio = audio.cpu()
+                    audio_segments.append(audio)
+                
+                generation_time = time.time() - start_time
+                app.logger.info(f"Audio generation completed in {generation_time:.2f}s")
+            
+            if not audio_segments:
+                return jsonify({'error': {'message': 'Failed to generate audio', 'type': 'server_error'}}), 500
+            
+            # Concatenate audio
+            if len(audio_segments) > 1:
+                full_audio = torch.cat(audio_segments, dim=-1)
+            else:
+                full_audio = audio_segments[0]
+            
+            # Save to buffer with requested format
+            output_buffer = io.BytesIO()
+            
+            if response_format in ['wav', 'pcm']:
+                sf.write(output_buffer, full_audio.numpy(), 22050, format='wav')
+                mimetype = 'audio/wav'
+            elif response_format == 'mp3':
+                # WAV format with mp3 mimetype (actual mp3 encoding would require pydub/ffmpeg)
+                sf.write(output_buffer, full_audio.numpy(), 22050, format='wav')
+                mimetype = 'audio/mpeg'
+            else:
+                # Default to WAV
+                sf.write(output_buffer, full_audio.numpy(), 22050, format='wav')
+                mimetype = 'audio/wav'
+            
+            output_buffer.seek(0)
+            return send_file(
+                output_buffer,
+                mimetype=mimetype,
+                as_attachment=False,
+                download_name=f'speech.{response_format}'
+            )
+    
+    except Exception as e:
+        app.logger.exception(f"OpenAI-compatible endpoint error: {e}")
+        return jsonify({'error': {'message': str(e), 'type': 'server_error'}}), 500
+
+@app.route('/v1/models', methods=['GET'])
+def list_models():
+    """List available models - OpenAI-compatible endpoint."""
+    return jsonify({
+        'object': 'list',
+        'data': [
+            {
+                'id': 'kokoro',
+                'object': 'model',
+                'created': int(time.time()),
+                'owned_by': 'kokoro-tts'
+            }
+        ]
+    })
 
 if __name__ == '__main__':
     # Initialize a default pipeline on server startup for faster first request

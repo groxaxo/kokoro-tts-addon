@@ -25,6 +25,9 @@ It uses a lightweight Flask server and the Kokoro model running locally on your 
 - 🧊 Lightweight: Small 82M parameters
 - 🥔 Works on low-end CPUs
 - 🌍 Linux, macOS, and Windows support
+- 🔌 OpenAI-compatible API endpoint for integration with VibeVoice and other services
+- 📡 Real-time streaming support with SSE (Server-Sent Events)
+- ⚙️ Configurable API endpoint for local or remote TTS services
 
 ---
 
@@ -76,11 +79,92 @@ For advanced configuration and usage on Windows, see the [official espeak-ng Win
 
 ---
 
+## 🔌 OpenAI API Integration & VibeVoice Support
+
+The server now supports OpenAI-compatible API endpoints, allowing integration with services like VibeVoice!
+
+### OpenAI-Compatible Endpoint
+
+The server exposes `/v1/audio/speech` endpoint that accepts OpenAI-style requests:
+
+```bash
+curl -X POST "http://localhost:8000/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kokoro",
+    "voice": "af_heart",
+    "input": "Hello, this is a test!",
+    "response_format": "wav",
+    "speed": 1.0
+  }' \
+  --output speech.wav
+```
+
+### Streaming with SSE
+
+For real-time streaming, add `stream_format: "sse"` to your request:
+
+```bash
+curl -X POST "http://localhost:8000/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kokoro",
+    "voice": "af_heart",
+    "input": "Hello, streaming audio!",
+    "response_format": "pcm",
+    "stream_format": "sse"
+  }'
+```
+
+### Using with VibeVoice
+
+To use an external VibeVoice API server:
+
+1. Open the extension popup
+2. Set the **API Endpoint** to your VibeVoice server URL (e.g., `http://127.0.0.1:8000`)
+3. Enter your **API Key** if required
+4. Check the **"Use OpenAI-compatible format"** checkbox
+5. Select your text and generate speech!
+
+The extension will automatically use the VibeVoice streaming format and handle SSE responses.
+
+### Voice Mapping
+
+The following OpenAI voice names are automatically mapped to Kokoro voices:
+- `alloy` → `af_alloy`
+- `echo` → `am_echo`
+- `fable` → `bm_fable`
+- `onyx` → `am_onyx`
+- `nova` → `af_nova`
+- `shimmer` → `af_sky`
+
+### Testing the API
+
+We provide several ways to test the OpenAI-compatible endpoint:
+
+**Option 1: Web Interface**
+Open `test_openai_endpoint.html` in your browser to test the API endpoint with a user-friendly interface.
+
+**Option 2: Python Test Script**
+```bash
+python3 test_api.py
+# Or with custom endpoint and API key:
+python3 test_api.py http://your-server:8000 your-api-key
+```
+
+**Option 3: OpenAI Python Client Examples**
+```bash
+pip install openai
+python3 example_openai_client.py
+```
+
+---
+
 ## 📌 Notes
 
 - First-time run will download the model
 - Make sure Python 3.8+ is installed and in PATH
-- All processing is local — nothing leaves your machine
+- All processing is local — nothing leaves your machine (unless using external API endpoint)
 
 ---
 
