@@ -50,7 +50,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 ## ⚙️ Installation
 
-> 📖 **For detailed installation instructions, see [INSTALL.md](INSTALL.md)**
+> 🚀 **Quick start in 5 minutes**: See [QUICKSTART.md](QUICKSTART.md)  
+> 📖 **Detailed instructions**: See [INSTALL.md](INSTALL.md)
 
 ### 1. Download from Releases
 
