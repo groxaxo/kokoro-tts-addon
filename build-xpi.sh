@@ -26,6 +26,12 @@ zip -r "${XPI_NAME}" \
     icons/
 
 echo "✓ Successfully created ${XPI_NAME}"
+
+# Generate checksum
+echo "Generating SHA256 checksum..."
+sha256sum "${XPI_NAME}" > "${XPI_NAME}.sha256"
+echo "✓ Checksum saved to ${XPI_NAME}.sha256"
+
 echo ""
 echo "To install in Firefox:"
 echo "1. Go to about:addons"

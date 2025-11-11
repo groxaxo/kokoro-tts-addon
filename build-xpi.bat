@@ -19,6 +19,14 @@ ren %XPI_NAME%.zip %XPI_NAME%
 
 echo.
 echo Successfully created %XPI_NAME%
+
+REM Generate checksum
+echo Generating SHA256 checksum...
+powershell -Command "Get-FileHash -Algorithm SHA256 '%XPI_NAME%' | Select-Object -ExpandProperty Hash | Out-File -Encoding ASCII -NoNewline '%XPI_NAME%.sha256.tmp'"
+powershell -Command "((Get-Content '%XPI_NAME%.sha256.tmp') + '  %XPI_NAME%') | Set-Content '%XPI_NAME%.sha256'"
+del %XPI_NAME%.sha256.tmp
+echo Checksum saved to %XPI_NAME%.sha256
+
 echo.
 echo To install in Firefox:
 echo 1. Go to about:addons
