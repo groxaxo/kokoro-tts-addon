@@ -20,25 +20,57 @@ It uses a lightweight Flask server and the Kokoro model running locally on your 
 
 ## 🚀 Features
 
-- 🎙️ Neural TTS with multiple voice options
-- 🔒 Offline-first & privacy-respecting
-- 🧊 Lightweight: Small 82M parameters
-- 🥔 Works on low-end CPUs
-- 🌍 Linux, macOS, and Windows support
-- 🔌 OpenAI-compatible API endpoint for integration with VibeVoice and other services
-- 📡 Real-time streaming support with SSE (Server-Sent Events)
-- ⚙️ Configurable API endpoint for local or remote TTS services
+- 🎙️ **Neural TTS** with multiple voice options (American, British, Spanish, French, Italian, Portuguese, Hindi, Japanese, Chinese)
+- 🔒 **Offline-first** & privacy-respecting — no cloud APIs or telemetry
+- 🧊 **Lightweight**: Only 82M parameters
+- 🥔 **Works on low-end CPUs** — tested on hardware from 2013
+- 🌍 **Cross-platform**: Linux, macOS, and Windows support
+- 🔌 **OpenAI-compatible API** endpoint for seamless integration with VibeVoice and other services
+- 📡 **Real-time streaming** support with SSE (Server-Sent Events)
+- ⚙️ **Configurable endpoints** — use local server or connect to remote TTS services
+- 🎯 **Drop-in replacement** for OpenAI TTS API
+
+---
+
+## ✨ What's New in v3.1
+
+**OpenAI API Compatibility & Enhanced Integration**
+
+- 🆕 Full OpenAI-compatible API at `/v1/audio/speech`
+- 🆕 VibeVoice integration support with SSE streaming
+- 🆕 Configurable API endpoints in extension UI
+- 🆕 API key authentication for remote services
+- 🆕 Voice mapping for OpenAI voice names (alloy, echo, fable, onyx, nova, shimmer)
+- 🆕 Comprehensive testing suite with web interface and Python scripts
+- 📚 New documentation: [Integration Guide](INTEGRATION_GUIDE.md) and [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
+
+See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 ---
 
 ## ⚙️ Installation
 
+> 🚀 **Quick start in 5 minutes**: See [QUICKSTART.md](QUICKSTART.md)  
+> 📖 **Detailed instructions**: See [INSTALL.md](INSTALL.md)
+
 ### 1. Download from Releases
 
-Head to the [Releases Page](https://github.com/pinguy/kokoro-tts-addon/releases) and grab:
+Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases) and grab:
 
-- `latest kokoro-tts-addon.xpi`
-- `server.py`
+- `kokoro-tts-addon-v3.1.xpi` (the Firefox extension)
+- `server.py` (the local TTS server)
+
+**Alternative: Build from Source**
+
+```bash
+# Linux/macOS
+./build-xpi.sh
+
+# Windows
+build-xpi.bat
+```
+
+This will create `kokoro-tts-addon-v3.1.xpi` in the current directory.
 
 ### 2. Install the Add-on in Firefox
 

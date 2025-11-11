@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.1] - 2025-11-11
 
 ### Added
 - OpenAI-compatible API endpoint at `/v1/audio/speech` for integration with external services
