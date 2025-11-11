@@ -50,6 +50,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 ## ⚙️ Installation
 
+> 📖 **For detailed installation instructions, see [INSTALL.md](INSTALL.md)**
+
 ### 1. Download from Releases
 
 Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases) and grab:
