@@ -41,3 +41,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Build artifacts
+*.xpi
+web-ext-artifacts/
