@@ -237,6 +237,38 @@
             background: rgba(100, 255, 218, 0.5); /* Darker teal on hover */
         }
 
+        /* Text Input Styling */
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            color: #ffffff;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #64ffda;
+            box-shadow: 0 0 0 2px rgba(100, 255, 218, 0.1);
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        input[type="text"]::placeholder, input[type="password"]::placeholder {
+            color: #64748b;
+        }
+
+        /* Checkbox Styling */
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #64ffda;
+        }
+
         /* Select Input Styling */
         select {
             width: 100%;
@@ -612,6 +644,23 @@
                         <option value="p">🇧🇷 Portuguese (BR)</option>
                         <option value="z">🇨🇳 Mandarin Chinese</option>
                     </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="apiEndpoint">API Endpoint</label>
+                    <input type="text" id="apiEndpoint" placeholder="http://localhost:8000" value="http://localhost:8000">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="apiKey">API Key (Optional)</label>
+                    <input type="password" id="apiKey" placeholder="Enter API key for external services">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="useOpenAIFormat" style="width: auto; height: auto;">
+                        <span>Use OpenAI-compatible format</span>
+                    </label>
                 </div>
             </div>
             

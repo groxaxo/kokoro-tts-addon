@@ -108,7 +108,10 @@ async function speakText(text, tabId) {
         const settings = await browser.storage.local.get({
             voice: 'af_heart',
             speed: 1.0,
-            language: 'a'
+            language: 'a',
+            apiEndpoint: 'http://localhost:8000',
+            apiKey: '',
+            useOpenAIFormat: false
         });
         
         console.log("Background Script: Sending request to TTS server with settings:", settings);
@@ -123,45 +126,124 @@ async function speakText(text, tabId) {
             }
         }
 
-        // Streaming request
-        const response = await fetch('http://localhost:8000/stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: text.trim(),
+        // Choose endpoint based on format
+        let url, headers, body;
+        
+        if (settings.useOpenAIFormat) {
+            // OpenAI-compatible format with SSE streaming
+            url = `${settings.apiEndpoint}/v1/audio/speech`;
+            headers = { 'Content-Type': 'application/json' };
+            
+            if (settings.apiKey) {
+                headers['Authorization'] = `Bearer ${settings.apiKey}`;
+            }
+            
+            body = JSON.stringify({
+                model: 'kokoro',
                 voice: settings.voice,
+                input: text.trim(),
+                response_format: 'pcm',
                 speed: settings.speed,
-                language: settings.language
-            })
-        });
+                language: settings.language,
+                stream_format: 'sse'
+            });
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: body
+            });
 
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-        }
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
 
-        const reader = response.body.getReader();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            // Send audio chunk to content script
-            if (tabId) {
-                try {
-                    await browser.tabs.sendMessage(tabId, {
-                        action: 'streamTTSChunk',
-                        chunk: value.buffer // Send ArrayBuffer
-                    });
-                } catch (error) {
-                    console.error("Error streaming chunk:", error);
+            // Handle SSE streaming
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            if (data.done) {
+                                // Signal end of stream
+                                if (tabId) {
+                                    await browser.tabs.sendMessage(tabId, {
+                                        action: 'streamEnd'
+                                    });
+                                }
+                            } else if (data.audio) {
+                                // Decode base64 audio and send to content script
+                                const audioData = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+                                if (tabId) {
+                                    await browser.tabs.sendMessage(tabId, {
+                                        action: 'streamTTSChunk',
+                                        chunk: audioData.buffer
+                                    });
+                                }
+                            } else if (data.error) {
+                                throw new Error(data.error);
+                            }
+                        } catch (e) {
+                            console.error("Error parsing SSE data:", e);
+                        }
+                    }
                 }
             }
-        }
-        
-        // Signal end of stream
-        if (tabId) {
-            await browser.tabs.sendMessage(tabId, {
-                action: 'streamEnd'
+        } else {
+            // Original Kokoro streaming format
+            url = `${settings.apiEndpoint}/stream`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: text.trim(),
+                    voice: settings.voice,
+                    speed: settings.speed,
+                    language: settings.language
+                })
             });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Send audio chunk to content script
+                if (tabId) {
+                    try {
+                        await browser.tabs.sendMessage(tabId, {
+                            action: 'streamTTSChunk',
+                            chunk: value.buffer // Send ArrayBuffer
+                        });
+                    } catch (error) {
+                        console.error("Error streaming chunk:", error);
+                    }
+                }
+            }
+            
+            // Signal end of stream
+            if (tabId) {
+                await browser.tabs.sendMessage(tabId, {
+                    action: 'streamEnd'
+                });
+            }
         }
         
     } catch (error) {
