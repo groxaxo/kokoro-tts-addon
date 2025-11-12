@@ -25,7 +25,7 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "dist/content-bundle.js"
       ],
       "css": [
         "styles.css"
@@ -45,8 +45,7 @@
   },
   "web_accessible_resources": [
     "player.html",
-    "player.js",
-    "kokoro-embedded.js"
+    "player.js"
   ],
   "browser_specific_settings": {
     "gecko": {

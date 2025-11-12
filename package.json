@@ -1,0 +1,26 @@
+{
+  "name": "kokoro-tts-addon",
+  "version": "3.1.0",
+  "description": "Text-to-Speech using Kokoro model with OpenAI-compatible API support",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "build:extension": "npm run build && ./build-xpi.sh"
+  },
+  "keywords": [
+    "tts",
+    "text-to-speech",
+    "kokoro",
+    "firefox-addon"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "rollup": "^4.9.6"
+  },
+  "dependencies": {
+    "kokoro-js": "^1.2.1"
+  }
+}
