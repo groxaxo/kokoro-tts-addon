@@ -525,6 +525,17 @@ def openai_compatible_speech():
     Supports both streaming and non-streaming responses.
     """
     try:
+        # Optional: Check Authorization header if API_KEY environment variable is set
+        required_api_key = os.environ.get('API_KEY')
+        if required_api_key:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return jsonify({'error': {'message': 'Missing or invalid authorization', 'type': 'invalid_request_error'}}), 401
+            
+            provided_key = auth_header.replace('Bearer ', '')
+            if provided_key != required_api_key:
+                return jsonify({'error': {'message': 'Invalid API key', 'type': 'invalid_request_error'}}), 401
+        
         data = request.get_json()
         
         if not data:
