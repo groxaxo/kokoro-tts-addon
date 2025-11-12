@@ -109,6 +109,81 @@
         showNotification('Speech playback stopped', 'info');
     }
 
+    /**
+     * Generates speech using embedded browser-based Kokoro TTS
+     */
+    let embeddedTTSInstance = null;
+    
+    async function generateEmbeddedTTSInPage(text, voice, speed, language) {
+        try {
+            showNotification('Initializing embedded TTS...', 'loading');
+            
+            // Dynamically import kokoro-js
+            if (!window.KokoroTTS) {
+                const module = await import('https://cdn.jsdelivr.net/npm/kokoro-js@0.2.1/+esm');
+                window.KokoroTTS = module.KokoroTTS;
+            }
+            
+            // Initialize TTS if not already done
+            if (!embeddedTTSInstance) {
+                showNotification('Loading TTS model...', 'loading');
+                
+                embeddedTTSInstance = await window.KokoroTTS.from_pretrained(
+                    'onnx-community/Kokoro-82M-ONNX',
+                    { 
+                        dtype: 'q8',
+                        progress_callback: (progress) => {
+                            if (progress.status === 'progress') {
+                                const percent = Math.round((progress.loaded / progress.total) * 100);
+                                showNotification(`Downloading model: ${percent}%`, 'loading');
+                            }
+                        }
+                    }
+                );
+            }
+            
+            showNotification('Generating speech...', 'loading');
+            
+            // Generate audio
+            const audio = await embeddedTTSInstance.generate(text, { voice: voice, speed: speed });
+            
+            // Play the audio using Web Audio API
+            initAudioContext();
+            
+            const audioData = audio.data;
+            const sampleRate = audio.rate || 24000;
+            
+            // Create audio buffer
+            const buffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+            buffer.copyToChannel(audioData, 0);
+            
+            // Create source and play
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            
+            currentSourceNode = source;
+            
+            return new Promise((resolve, reject) => {
+                source.onended = () => {
+                    currentSourceNode = null;
+                    showNotification('Speech completed! 🎉', 'success');
+                    resolve();
+                };
+                source.onerror = (error) => {
+                    console.error('Audio playback error:', error);
+                    reject(error);
+                };
+                source.start(0);
+                showNotification('Playing speech...', 'success');
+            });
+            
+        } catch (error) {
+            console.error('Content Script: Embedded TTS generation error:', error);
+            throw error;
+        }
+    }
+
 
     /**
      * Creates and injects an invisible iframe to handle audio playback.
@@ -405,6 +480,19 @@
             showNotification(`Speech stream error: ${request.error}`, 'error');
             sendResponse({success: true});
             return true;
+        }
+        else if (request.action === 'generateEmbeddedTTS') {
+            // Handle embedded TTS generation in content script
+            generateEmbeddedTTSInPage(request.text, request.voice, request.speed, request.language)
+                .then(() => {
+                    sendResponse({success: true});
+                })
+                .catch(error => {
+                    console.error('Content Script: Embedded TTS error:', error);
+                    showNotification(`Embedded TTS error: ${error.message}`, 'error');
+                    sendResponse({success: false, error: error.message});
+                });
+            return true; // Indicate async response
         }
     });
     

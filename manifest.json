@@ -45,7 +45,8 @@
   },
   "web_accessible_resources": [
     "player.html",
-    "player.js"
+    "player.js",
+    "kokoro-embedded.js"
   ],
   "browser_specific_settings": {
     "gecko": {

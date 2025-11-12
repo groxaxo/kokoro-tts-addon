@@ -109,6 +109,7 @@ async function speakText(text, tabId) {
             voice: 'af_heart',
             speed: 1.0,
             language: 'a',
+            ttsMode: 'api',
             apiEndpoint: 'http://localhost:8000',
             apiKey: '',
             useOpenAIFormat: false
@@ -116,6 +117,27 @@ async function speakText(text, tabId) {
         
         console.log("Background Script: Sending request to TTS server with settings:", settings);
 
+        // Check if using embedded mode
+        if (settings.ttsMode === 'embedded') {
+            // For embedded mode, delegate to content script to handle
+            if (tabId) {
+                try {
+                    await browser.tabs.sendMessage(tabId, { 
+                        action: 'generateEmbeddedTTS',
+                        text: text.trim(),
+                        voice: settings.voice,
+                        speed: settings.speed,
+                        language: settings.language
+                    });
+                } catch (error) {
+                    console.error("Background Script: Error sending embedded TTS message:", error);
+                    throw error;
+                }
+            }
+            return;
+        }
+
+        // API mode - continue with existing logic
         // Notify content script that speech generation is starting (for in-page notification)
         if (tabId) {
             try {
