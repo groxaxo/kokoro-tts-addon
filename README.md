@@ -10,11 +10,14 @@
 ## 🔍 What is This?
 
 Kokoro TTS is a browser extension that lets you convert selected or pasted text into natural-sounding speech — without needing an internet connection.  
-It uses a lightweight Flask server and the Kokoro model running locally on your system.
+It supports **two modes**:
+1. **API Mode**: Uses a lightweight Flask server with the Kokoro model running locally on your system
+2. **Embedded Mode**: Runs 100% in your browser using WebGPU/WASM (no server needed!)
 
 - ✅ No accounts or logins
 - ✅ No cloud APIs or telemetry
-- ✅ No GPU required but helps a lot, if no usable GPU falls to using the CPU.
+- ✅ No GPU required but helps a lot, if no usable GPU falls to using the CPU
+- ✅ NEW: Browser-based mode with no server setup required!
 
 ---
 
@@ -29,20 +32,29 @@ It uses a lightweight Flask server and the Kokoro model running locally on your 
 - 📡 **Real-time streaming** support with SSE (Server-Sent Events)
 - ⚙️ **Configurable endpoints** — use local server or connect to remote TTS services
 - 🎯 **Drop-in replacement** for OpenAI TTS API
+- 🌐 **NEW: Embedded Browser Mode** — Run TTS 100% in your browser using kokoro-js with WebGPU/WASM acceleration (no server required!)
 
 ---
 
-## ✨ What's New in v3.1
+## ✨ What's New in v3.2
 
-**OpenAI API Compatibility & Enhanced Integration**
+**Embedded Browser-Based TTS Mode**
 
-- 🆕 Full OpenAI-compatible API at `/v1/audio/speech`
-- 🆕 VibeVoice integration support with SSE streaming
-- 🆕 Configurable API endpoints in extension UI
-- 🆕 API key authentication for remote services
-- 🆕 Voice mapping for OpenAI voice names (alloy, echo, fable, onyx, nova, shimmer)
-- 🆕 Comprehensive testing suite with web interface and Python scripts
-- 📚 New documentation: [Integration Guide](INTEGRATION_GUIDE.md) and [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
+- 🆕 **Embedded Mode**: Run Kokoro TTS 100% in your browser using kokoro-js
+- 🆕 **No Server Required**: Choose between API mode (server-based) or Embedded mode (browser-based)
+- 🆕 **WebGPU/WASM Acceleration**: Fast inference directly in the browser
+- 🆕 **Easy Mode Selection**: Switch between API and Embedded modes in the extension popup
+- 🆕 **Automatic Model Download**: First-time use downloads the model (~86MB with q8 quantization)
+- 🆕 **Privacy-First**: In Embedded mode, everything runs locally in your browser—no server, no network requests
+
+**Previous (v3.1): OpenAI API Compatibility & Enhanced Integration**
+
+- Full OpenAI-compatible API at `/v1/audio/speech`
+- VibeVoice integration support with SSE streaming
+- Configurable API endpoints in extension UI
+- API key authentication for remote services
+- Voice mapping for OpenAI voice names (alloy, echo, fable, onyx, nova, shimmer)
+- Comprehensive testing suite with web interface and Python scripts
 
 See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
@@ -52,13 +64,14 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 > 🚀 **Quick start in 5 minutes**: See [QUICKSTART.md](QUICKSTART.md)  
 > 📖 **Detailed instructions**: See [INSTALL.md](INSTALL.md)
+> 🌐 **NEW: No setup needed!** Just install the extension and use Embedded mode
 
 ### 1. Download from Releases
 
 Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases) and grab:
 
-- `kokoro-tts-addon-v3.1.xpi` (the Firefox extension)
-- `server.py` (the local TTS server)
+- `kokoro-tts-addon-v3.2.xpi` (the Firefox extension)
+- `server.py` (the local TTS server - **optional**, only needed for API mode)
 
 **Alternative: Build from Source**
 
@@ -70,7 +83,7 @@ Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases
 build-xpi.bat
 ```
 
-This will create `kokoro-tts-addon-v3.1.xpi` in the current directory.
+This will create `kokoro-tts-addon-v3.2.xpi` in the current directory.
 
 ### 2. Install the Add-on in Firefox
 
@@ -78,7 +91,9 @@ This will create `kokoro-tts-addon-v3.1.xpi` in the current directory.
 - Click the gear icon → `Install Add-on From File...`
 - Select the `.xpi` you downloaded
 
-### 3. Start the Local Server
+**That's it for Embedded mode!** You can start using it right away.
+
+### 3. Start the Local Server (Optional - Only for API Mode)
 
 #### macOS / Linux:
 ```bash
@@ -103,7 +118,38 @@ For advanced configuration and usage on Windows, see the [official espeak-ng Win
 
 ---
 
+## 🌐 Using Embedded Browser Mode (No Server Required!)
+
+**New in v3.2!** You can now use Kokoro TTS without any server setup:
+
+1. Open the extension popup
+2. Select **"Embedded (Browser)"** from the **TTS Mode** dropdown
+3. Enter or select text to speak
+4. Click **"Generate Speech"**
+5. On first use, the model will be downloaded (~86MB) - this is cached for future use
+6. Speech generation happens entirely in your browser using WebGPU/WASM!
+
+**Benefits of Embedded Mode:**
+- ✅ No Python server required
+- ✅ No installation needed beyond the browser extension
+- ✅ WebGPU acceleration for fast inference
+- ✅ 100% privacy - everything runs locally in your browser
+- ✅ Works offline after initial model download
+
+**When to use API Mode vs Embedded Mode:**
+- **API Mode**: Better for batch processing, server integration, or when you already have a server running
+- **Embedded Mode**: Perfect for casual use, no setup required, maximum privacy
+
+---
+
 ## 🧪 How to Test
+
+**For Embedded Mode:**
+1. Install the extension
+2. Select "Embedded (Browser)" mode in the popup
+3. Enter text and generate speech - that's it!
+
+**For API Mode:**
 
 1. Visit `http://localhost:8000/health`  
 2. You should see a simple “healthy” JSON response
