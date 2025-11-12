@@ -111,6 +111,15 @@ function setupEventListeners() {
         }
     });
 
+    // Refresh models when API endpoint or key changes
+    apiEndpoint.addEventListener('change', async () => {
+        await fetchAndPopulateModels();
+    });
+    
+    apiKey.addEventListener('change', async () => {
+        await fetchAndPopulateModels();
+    });
+
     // Auto-resize text area as user types
     textInput.addEventListener('input', function() {
         this.style.height = 'auto'; // Reset height to recalculate
@@ -218,11 +227,12 @@ async function loadSettings() {
             useOpenAIFormat: false                // Default to Kokoro format
         });
 
-        // Only set the value if the option exists, otherwise default will be used
-        if (Array.from(voiceSelect.options).some(option => option.value === result.voice)) {
+        // Only set the value if the option exists, otherwise use the first available option
+        const voiceOptions = Array.from(voiceSelect.options);
+        if (voiceOptions.some(option => option.value === result.voice)) {
             voiceSelect.value = result.voice;
-        } else {
-            voiceSelect.value = 'af_heart'; // Fallback to a safe default if saved voice is not available
+        } else if (voiceOptions.length > 0) {
+            voiceSelect.value = voiceOptions[0].value; // Use first available voice
         }
 
         speedInput.value = result.speed;
@@ -363,50 +373,137 @@ async function checkServerStatus() {
 }
 
 /**
- * Fetches available voices and languages from the server and populates the dropdowns.
+ * Fetches available models and voices from the server using OpenAI-compatible endpoints.
+ * This function dynamically populates the voice dropdown based on available models.
  */
-async function populateDropdownsFromSever() {
+async function fetchAndPopulateModels() {
     try {
         const endpoint = apiEndpoint.value || 'http://localhost:8000';
-        const response = await fetch(`${endpoint}/health`);
-        if (response.ok) {
-            const data = await response.json();
-
-            // Clear existing options
-            voiceSelect.innerHTML = '';
-            langSelect.innerHTML = '';
-
-            // Populate Voice dropdown
-            if (data.available_voices) {
-                data.available_voices.forEach(voiceCode => {
+        const key = apiKey.value;
+        
+        // Show loading status
+        showStatus('Loading models...', 'loading');
+        speakBtn.disabled = true;
+        
+        // Prepare headers
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        if (key) {
+            headers['Authorization'] = `Bearer ${key}`;
+        }
+        
+        // Try to fetch models from OpenAI-compatible endpoint first
+        let modelsResponse;
+        try {
+            modelsResponse = await fetch(`${endpoint}/v1/models`, { headers });
+        } catch (err) {
+            console.log('OpenAI models endpoint not available, trying legacy endpoint');
+        }
+        
+        // Try to fetch voices from OpenAI-compatible endpoint
+        let voicesResponse;
+        try {
+            voicesResponse = await fetch(`${endpoint}/v1/voices`, { headers });
+        } catch (err) {
+            console.log('OpenAI voices endpoint not available');
+        }
+        
+        // Also try health endpoint for backward compatibility
+        const healthResponse = await fetch(`${endpoint}/health`);
+        
+        // Clear existing options
+        voiceSelect.innerHTML = '';
+        langSelect.innerHTML = '';
+        
+        let voicesPopulated = false;
+        
+        // Try to populate from /v1/voices endpoint first
+        if (voicesResponse && voicesResponse.ok) {
+            const voicesData = await voicesResponse.json();
+            if (voicesData.data && voicesData.data.length > 0) {
+                voicesData.data.forEach(voice => {
                     const option = document.createElement('option');
-                    option.value = voiceCode;
-                    option.textContent = VOICE_DISPLAY_NAMES[voiceCode] || voiceCode; // Use display name or code
+                    option.value = voice.id;
+                    option.textContent = VOICE_DISPLAY_NAMES[voice.id] || voice.name || voice.id;
                     voiceSelect.appendChild(option);
                 });
+                voicesPopulated = true;
             }
-
-            // Populate Language dropdown
-            if (data.available_languages) {
-                data.available_languages.forEach(langCode => {
+        }
+        
+        // If voices not populated yet, try models endpoint (filter out 'kokoro' main model)
+        if (!voicesPopulated && modelsResponse && modelsResponse.ok) {
+            const modelsData = await modelsResponse.json();
+            if (modelsData.data && modelsData.data.length > 0) {
+                modelsData.data
+                    .filter(model => model.id !== 'kokoro') // Filter out the main kokoro model
+                    .forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = VOICE_DISPLAY_NAMES[model.id] || model.id;
+                        voiceSelect.appendChild(option);
+                    });
+                voicesPopulated = true;
+            }
+        }
+        
+        // Fall back to health endpoint for backward compatibility
+        if (!voicesPopulated && healthResponse.ok) {
+            const healthData = await healthResponse.json();
+            if (healthData.available_voices) {
+                healthData.available_voices.forEach(voiceCode => {
+                    const option = document.createElement('option');
+                    option.value = voiceCode;
+                    option.textContent = VOICE_DISPLAY_NAMES[voiceCode] || voiceCode;
+                    voiceSelect.appendChild(option);
+                });
+                voicesPopulated = true;
+            }
+        }
+        
+        // Populate languages from health endpoint (or use defaults)
+        if (healthResponse.ok) {
+            const healthData = await healthResponse.json();
+            if (healthData.available_languages) {
+                healthData.available_languages.forEach(langCode => {
                     const option = document.createElement('option');
                     option.value = langCode;
-                    option.textContent = LANGUAGE_DISPLAY_NAMES[langCode] || langCode; // Use display name or code
+                    option.textContent = LANGUAGE_DISPLAY_NAMES[langCode] || langCode;
                     langSelect.appendChild(option);
                 });
             }
-
         } else {
-            console.error('Failed to fetch server capabilities:', response.statusText);
-            showStatus('Failed to load voices/languages from server.', 'error');
-            // Optionally, if server is down, you might want to disable speak button
-            speakBtn.disabled = true;
+            // Use default languages if health endpoint not available
+            Object.entries(LANGUAGE_DISPLAY_NAMES).forEach(([code, name]) => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = name;
+                langSelect.appendChild(option);
+            });
         }
+        
+        if (voicesPopulated) {
+            showStatus('Models loaded successfully!', 'success');
+            speakBtn.disabled = false;
+        } else {
+            throw new Error('No voices/models found');
+        }
+        
     } catch (error) {
-        console.error('Error fetching server capabilities:', error);
-        showStatus('Could not connect to TTS server to get available options.', 'error');
-        speakBtn.disabled = true; // Disable if server isn't reachable
+        console.error('Error fetching models:', error);
+        showStatus('Could not load models. Check endpoint and try again.', 'error');
+        speakBtn.disabled = true;
     }
+}
+
+/**
+ * Fetches available voices and languages from the server and populates the dropdowns.
+ * This is the legacy function maintained for backward compatibility.
+ */
+async function populateDropdownsFromSever() {
+    await fetchAndPopulateModels();
 }
 
 /**

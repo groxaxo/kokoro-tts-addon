@@ -656,16 +656,45 @@ def openai_compatible_speech():
 @app.route('/v1/models', methods=['GET'])
 def list_models():
     """List available models - OpenAI-compatible endpoint."""
+    models = []
+    
+    # Add the main kokoro model
+    models.append({
+        'id': 'kokoro',
+        'object': 'model',
+        'created': int(time.time()),
+        'owned_by': 'kokoro-tts'
+    })
+    
+    # Add each voice as a separate model for compatibility
+    for voice_id in VOICE_MAPPING.keys():
+        models.append({
+            'id': voice_id,
+            'object': 'model',
+            'created': int(time.time()),
+            'owned_by': 'kokoro-tts'
+        })
+    
     return jsonify({
         'object': 'list',
-        'data': [
-            {
-                'id': 'kokoro',
-                'object': 'model',
-                'created': int(time.time()),
-                'owned_by': 'kokoro-tts'
-            }
-        ]
+        'data': models
+    })
+
+@app.route('/v1/voices', methods=['GET'])
+def list_voices():
+    """List available voices - OpenAI-compatible endpoint."""
+    voices = []
+    
+    for voice_id, voice_name in VOICE_MAPPING.items():
+        voices.append({
+            'id': voice_id,
+            'name': voice_name,
+            'object': 'voice'
+        })
+    
+    return jsonify({
+        'object': 'list',
+        'data': voices
     })
 
 if __name__ == '__main__':
