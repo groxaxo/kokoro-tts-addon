@@ -75,7 +75,12 @@ Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases
 
 **Alternative: Build from Source**
 
+Building from source requires Node.js and npm to be installed for bundling the embedded TTS functionality.
+
 ```bash
+# Install dependencies (only needed once)
+npm install
+
 # Linux/macOS
 ./build-xpi.sh
 
@@ -83,7 +88,9 @@ Head to the [Releases Page](https://github.com/groxaxo/kokoro-tts-addon/releases
 build-xpi.bat
 ```
 
-This will create `kokoro-tts-addon-v3.2.xpi` in the current directory.
+This will:
+1. Bundle the kokoro-js library with the content script using Rollup
+2. Create `kokoro-tts-addon-v3.2.xpi` in the current directory
 
 ### 2. Install the Add-on in Firefox
 
