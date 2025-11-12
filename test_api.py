@@ -96,6 +96,27 @@ def test_models_endpoint(base_url):
         print(f"✗ Failed to connect: {e}")
         return False
 
+def test_voices_endpoint(base_url):
+    """Test the voices listing endpoint."""
+    print(f"\n🎤 Testing voices endpoint: {base_url}/v1/voices")
+    try:
+        response = requests.get(f"{base_url}/v1/voices", timeout=5)
+        if response.ok:
+            data = response.json()
+            print("✓ Voices endpoint working!")
+            print(f"  Available voices: {len(data.get('data', []))}")
+            for voice in data.get('data', [])[:5]:  # Show first 5
+                print(f"    - {voice.get('id')} ({voice.get('name')})")
+            if len(data.get('data', [])) > 5:
+                print(f"    ... and {len(data.get('data', [])) - 5} more")
+            return True
+        else:
+            print(f"✗ Request failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"✗ Failed to connect: {e}")
+        return False
+
 def main():
     """Run all tests."""
     base_url = 'http://localhost:8000'
@@ -119,6 +140,7 @@ def main():
     results = {
         'health': test_health(base_url),
         'models': test_models_endpoint(base_url),
+        'voices': test_voices_endpoint(base_url),
         'speech': test_openai_endpoint(base_url, api_key)
     }
     
