@@ -10,6 +10,7 @@ const voiceSelect = document.getElementById('voiceSelect');
 const speedInput = document.getElementById('speedInput');
 const speedValue = document.getElementById('speedValue');
 const langSelect = document.getElementById('langSelect');
+const ttsMode = document.getElementById('ttsMode');
 const apiEndpoint = document.getElementById('apiEndpoint');
 const apiKey = document.getElementById('apiKey');
 const useOpenAIFormat = document.getElementById('useOpenAIFormat');
@@ -25,6 +26,14 @@ const replayBtn = document.getElementById('replayBtn');
 const getSelectionBtn = document.getElementById('getSelection');
 const getPageBtn = document.getElementById('getPage');
 const clearTextBtn = document.getElementById('clearText');
+
+// API settings groups
+const apiSettingsGroup = document.getElementById('apiSettingsGroup');
+const apiKeyGroup = document.getElementById('apiKeyGroup');
+const openAIFormatGroup = document.getElementById('openAIFormatGroup');
+
+// Embedded Kokoro TTS instance (will be initialized when needed)
+let embeddedTTS = null;
 
 // Voice and Language Mappings for display (can be extended)
 const VOICE_DISPLAY_NAMES = {
@@ -101,6 +110,12 @@ function setupEventListeners() {
     clearTextBtn.addEventListener('click', () => {
         textInput.value = '';
         hideAudioControls();
+    });
+
+    // TTS mode change listener
+    ttsMode.addEventListener('change', () => {
+        handleTTSModeChange();
+        saveSettings();
     });
 
     // Auto-save settings when voice, speed, language, or API settings change
@@ -213,6 +228,7 @@ async function loadSettings() {
             voice: 'af_heart',                    // Default voice
             speed: 1.0,                           // Default speed
             language: 'a',                        // Default language (American English)
+            ttsMode: 'api',                       // Default TTS mode (API)
             apiEndpoint: 'http://localhost:8000', // Default endpoint
             apiKey: '',                           // Default API key (empty)
             useOpenAIFormat: false                // Default to Kokoro format
@@ -234,9 +250,13 @@ async function loadSettings() {
             langSelect.value = 'a'; // Fallback to a safe default if saved language is not available
         }
         
+        ttsMode.value = result.ttsMode;
         apiEndpoint.value = result.apiEndpoint;
         apiKey.value = result.apiKey;
         useOpenAIFormat.checked = result.useOpenAIFormat;
+
+        // Update UI based on TTS mode
+        handleTTSModeChange();
 
     } catch (error) {
         console.error('Failed to load settings:', error);
@@ -252,12 +272,32 @@ async function saveSettings() {
             voice: voiceSelect.value,
             speed: parseFloat(speedInput.value),
             language: langSelect.value,
+            ttsMode: ttsMode.value,
             apiEndpoint: apiEndpoint.value,
             apiKey: apiKey.value,
             useOpenAIFormat: useOpenAIFormat.checked
         });
     } catch (error) {
         console.error('Failed to save settings:', error);
+    }
+}
+
+/**
+ * Handles TTS mode changes to show/hide relevant UI elements
+ */
+function handleTTSModeChange() {
+    const mode = ttsMode.value;
+    
+    if (mode === 'embedded') {
+        // Hide API-related settings for embedded mode
+        apiSettingsGroup.style.display = 'none';
+        apiKeyGroup.style.display = 'none';
+        openAIFormatGroup.style.display = 'none';
+    } else {
+        // Show API-related settings for API mode
+        apiSettingsGroup.style.display = 'flex';
+        apiKeyGroup.style.display = 'flex';
+        openAIFormatGroup.style.display = 'flex';
     }
 }
 
@@ -410,8 +450,8 @@ async function populateDropdownsFromSever() {
 }
 
 /**
- * Generates speech from the text input using the configured TTS server.
- * Supports both Kokoro and OpenAI-compatible formats.
+ * Generates speech from the text input using the configured TTS method.
+ * Supports API endpoint (server-based) and embedded (browser-based) modes.
  * Plays the audio and handles UI state during generation.
  */
 async function generateSpeech() {
@@ -432,6 +472,117 @@ async function generateSpeech() {
     stopBtn.style.display = 'block';
     showStatus('Generating speech...', 'loading');
 
+    const mode = ttsMode.value;
+
+    try {
+        if (mode === 'embedded') {
+            // Use embedded browser-based Kokoro TTS
+            await generateSpeechEmbedded(text);
+        } else {
+            // Use API endpoint
+            await generateSpeechAPI(text);
+        }
+    } catch (error) {
+        console.error('TTS Error:', error);
+        showStatus('Failed to generate speech: ' + error.message, 'error');
+        cleanupAudioResources();
+    } finally {
+        isGenerating = false;
+        if (!currentAudio || currentAudio.paused) {
+            resetUI();
+        }
+    }
+}
+
+/**
+ * Generates speech using the embedded browser-based Kokoro TTS
+ */
+async function generateSpeechEmbedded(text) {
+    try {
+        // Initialize embedded TTS if not already initialized
+        if (!embeddedTTS) {
+            // Dynamically load the kokoro-embedded.js module
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.textContent = `
+                import('https://cdn.jsdelivr.net/npm/kokoro-js@0.2.1/+esm').then(({ KokoroTTS }) => {
+                    window.KokoroTTS = KokoroTTS;
+                }).catch(err => {
+                    console.error('Failed to load kokoro-js:', err);
+                });
+            `;
+            document.head.appendChild(script);
+            
+            // Wait for the library to load
+            await new Promise((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (window.KokoroTTS) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    if (!window.KokoroTTS) {
+                        reject(new Error('Timeout loading kokoro-js library'));
+                    }
+                }, 30000);
+            });
+            
+            showStatus('Initializing embedded TTS model...', 'loading');
+            
+            // Initialize the TTS model
+            embeddedTTS = await window.KokoroTTS.from_pretrained(
+                'onnx-community/Kokoro-82M-ONNX',
+                { 
+                    dtype: 'q8',
+                    progress_callback: (progress) => {
+                        if (progress.status === 'progress') {
+                            const percent = Math.round((progress.loaded / progress.total) * 100);
+                            showStatus(`Downloading model: ${percent}%`, 'loading');
+                        }
+                    }
+                }
+            );
+        }
+
+        showStatus('Generating speech with embedded TTS...', 'loading');
+
+        const voice = voiceSelect.value;
+        const speed = parseFloat(speedInput.value);
+
+        // Generate audio
+        const audio = await embeddedTTS.generate(text, { voice: voice, speed: speed });
+
+        // Convert audio data to WAV blob for playback and download
+        const audioBlob = await audioToWavBlob(audio);
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        // Store references for download functionality
+        currentAudioBlob = audioBlob;
+        currentAudioUrl = audioUrl;
+
+        // Play audio
+        audioPlayer.src = audioUrl;
+        audioPlayer.style.display = 'block';
+        audioPlayer.play();
+
+        currentAudio = audioPlayer;
+        showStatus('Speech generated successfully! 🎉', 'success');
+        showAudioControls();
+
+    } catch (error) {
+        console.error('Embedded TTS Error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Generates speech using API endpoint (server-based)
+ */
+async function generateSpeechAPI(text) {
     try {
         const endpoint = apiEndpoint.value || 'http://localhost:8000';
         const useOpenAI = useOpenAIFormat.checked;
@@ -501,15 +652,62 @@ async function generateSpeech() {
         showAudioControls();
 
     } catch (error) {
-        console.error('TTS Error:', error);
-        showStatus('Failed to generate speech: ' + error.message, 'error');
-        cleanupAudioResources();
-    } finally {
-        isGenerating = false;
-        if (!currentAudio || currentAudio.paused) {
-            resetUI();
-        }
+        console.error('API TTS Error:', error);
+        throw error;
     }
+}
+
+/**
+ * Helper function to convert kokoro-js audio output to WAV blob
+ */
+async function audioToWavBlob(audio) {
+    // Extract audio data and sample rate
+    const audioData = audio.data;
+    const sampleRate = audio.rate || 24000;
+    const numChannels = 1; // Mono
+    const bitsPerSample = 16;
+
+    // Calculate sizes
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = audioData.length * bytesPerSample;
+    const fileSize = 44 + dataSize; // 44 bytes for WAV header
+
+    // Create WAV file buffer
+    const buffer = new ArrayBuffer(fileSize);
+    const view = new DataView(buffer);
+
+    // Write WAV header
+    const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, fileSize - 8, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // PCM format chunk size
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    // Write audio data (convert Float32 to Int16)
+    let offset = 44;
+    for (let i = 0; i < audioData.length; i++) {
+        const sample = Math.max(-1, Math.min(1, audioData[i]));
+        view.setInt16(offset, sample * 32767, true);
+        offset += 2;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
 }
 
 /**

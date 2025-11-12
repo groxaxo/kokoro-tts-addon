@@ -647,16 +647,24 @@
                 </div>
                 
                 <div class="form-group">
+                    <label class="form-label" for="ttsMode">TTS Mode</label>
+                    <select id="ttsMode">
+                        <option value="api">API Endpoint (Server)</option>
+                        <option value="embedded">Embedded (Browser)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="apiSettingsGroup">
                     <label class="form-label" for="apiEndpoint">API Endpoint</label>
                     <input type="text" id="apiEndpoint" placeholder="http://localhost:8000" value="http://localhost:8000">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="apiKeyGroup">
                     <label class="form-label" for="apiKey">API Key (Optional)</label>
                     <input type="password" id="apiKey" placeholder="Enter API key for external services">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="openAIFormatGroup">
                     <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="useOpenAIFormat" style="width: auto; height: auto;">
                         <span>Use OpenAI-compatible format</span>

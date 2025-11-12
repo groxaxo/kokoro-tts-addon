@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Embedded Kokoro TTS Mode</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .primary-btn {
+            background: #667eea;
+            color: white;
+        }
+        .primary-btn:hover {
+            background: #5a67d8;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .loading { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Embedded Kokoro TTS Mode</h1>
+        
+        <div class="test-section">
+            <h3>Test 1: Extension Installed</h3>
+            <p>Check if the extension is properly installed in Firefox.</p>
+            <button class="primary-btn" onclick="testExtensionInstalled()">Test Extension</button>
+            <div id="test1-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: TTS Mode Selection</h3>
+            <p>Verify that both API and Embedded modes are available in the popup.</p>
+            <ol>
+                <li>Open the extension popup (click the icon in toolbar)</li>
+                <li>Look for "TTS Mode" dropdown</li>
+                <li>Verify it has "API Endpoint (Server)" and "Embedded (Browser)" options</li>
+                <li>Select "Embedded (Browser)"</li>
+                <li>Verify that API settings are hidden</li>
+            </ol>
+            <div id="test2-status" class="status info">✓ Manual test - check the extension popup</div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Kokoro.js Library Loading</h3>
+            <p>Test if kokoro-js can be loaded from CDN.</p>
+            <button class="primary-btn" onclick="testLibraryLoad()">Test Library Load</button>
+            <div id="test3-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 4: Embedded Mode Speech Generation</h3>
+            <p>Test speech generation in embedded mode (uses the extension).</p>
+            <textarea id="testText" placeholder="Enter text to test...">Hello, this is a test of the embedded Kokoro TTS mode.</textarea>
+            <br>
+            <label>Voice: 
+                <select id="testVoice">
+                    <option value="af_sky">American Female (Sky)</option>
+                    <option value="af_heart">American Female (Heart)</option>
+                    <option value="am_adam">American Male (Adam)</option>
+                    <option value="bm_george">British Male (George)</option>
+                </select>
+            </label>
+            <br>
+            <ol>
+                <li>Open the extension popup</li>
+                <li>Select "Embedded (Browser)" mode</li>
+                <li>Paste the text above</li>
+                <li>Click "Generate Speech"</li>
+                <li>Wait for model download (first time only, ~86MB)</li>
+                <li>Verify speech plays</li>
+            </ol>
+            <div id="test4-status" class="status info">✓ Manual test - use the extension popup</div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 5: API Mode Still Works</h3>
+            <p>Verify backward compatibility - API mode should still work.</p>
+            <ol>
+                <li>Open the extension popup</li>
+                <li>Select "API Endpoint (Server)" mode</li>
+                <li>Verify API settings are visible (endpoint, key, OpenAI format)</li>
+                <li>If server is running, test speech generation</li>
+            </ol>
+            <div id="test5-status" class="status info">✓ Manual test - use the extension popup</div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 6: Settings Persistence</h3>
+            <p>Verify settings are saved and loaded correctly.</p>
+            <ol>
+                <li>Open extension popup and select "Embedded (Browser)"</li>
+                <li>Close and reopen the popup</li>
+                <li>Verify "Embedded (Browser)" is still selected</li>
+                <li>Switch to "API Endpoint (Server)"</li>
+                <li>Close and reopen the popup</li>
+                <li>Verify "API Endpoint (Server)" is selected</li>
+            </ol>
+            <div id="test6-status" class="status info">✓ Manual test - use the extension popup</div>
+        </div>
+    </div>
+
+    <script>
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = `status ${type}`;
+            element.textContent = message;
+        }
+
+        function testExtensionInstalled() {
+            if (typeof browser !== 'undefined') {
+                showStatus('test1-status', '✓ Extension API detected! Firefox extension environment confirmed.', 'success');
+            } else {
+                showStatus('test1-status', '⚠ Extension API not detected. This test needs to run in Firefox with the extension installed.', 'error');
+            }
+        }
+
+        async function testLibraryLoad() {
+            try {
+                showStatus('test3-status', 'Loading kokoro-js library from CDN...', 'loading');
+                
+                const module = await import('https://cdn.jsdelivr.net/npm/kokoro-js@0.2.1/+esm');
+                
+                if (module.KokoroTTS) {
+                    showStatus('test3-status', '✓ kokoro-js library loaded successfully! KokoroTTS class is available.', 'success');
+                } else {
+                    showStatus('test3-status', '✗ Library loaded but KokoroTTS class not found.', 'error');
+                }
+            } catch (error) {
+                showStatus('test3-status', `✗ Failed to load kokoro-js: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('DOMContentLoaded', () => {
+            testExtensionInstalled();
+        });
+    </script>
+</body>
+</html>
