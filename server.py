@@ -525,6 +525,17 @@ def openai_compatible_speech():
     Supports both streaming and non-streaming responses.
     """
     try:
+        # Optional: Check Authorization header if API_KEY environment variable is set
+        required_api_key = os.environ.get('API_KEY')
+        if required_api_key:
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                return jsonify({'error': {'message': 'Missing or invalid authorization', 'type': 'invalid_request_error'}}), 401
+            
+            provided_key = auth_header.replace('Bearer ', '')
+            if provided_key != required_api_key:
+                return jsonify({'error': {'message': 'Invalid API key', 'type': 'invalid_request_error'}}), 401
+        
         data = request.get_json()
         
         if not data:
@@ -656,16 +667,45 @@ def openai_compatible_speech():
 @app.route('/v1/models', methods=['GET'])
 def list_models():
     """List available models - OpenAI-compatible endpoint."""
+    models = []
+    
+    # Add the main kokoro model
+    models.append({
+        'id': 'kokoro',
+        'object': 'model',
+        'created': int(time.time()),
+        'owned_by': 'kokoro-tts'
+    })
+    
+    # Add each voice as a separate model for compatibility
+    for voice_id in VOICE_MAPPING.keys():
+        models.append({
+            'id': voice_id,
+            'object': 'model',
+            'created': int(time.time()),
+            'owned_by': 'kokoro-tts'
+        })
+    
     return jsonify({
         'object': 'list',
-        'data': [
-            {
-                'id': 'kokoro',
-                'object': 'model',
-                'created': int(time.time()),
-                'owned_by': 'kokoro-tts'
-            }
-        ]
+        'data': models
+    })
+
+@app.route('/v1/voices', methods=['GET'])
+def list_voices():
+    """List available voices - OpenAI-compatible endpoint."""
+    voices = []
+    
+    for voice_id, voice_name in VOICE_MAPPING.items():
+        voices.append({
+            'id': voice_id,
+            'name': voice_name,
+            'object': 'voice'
+        })
+    
+    return jsonify({
+        'object': 'list',
+        'data': voices
     })
 
 if __name__ == '__main__':
