@@ -9,6 +9,14 @@ VERSION=$(grep -oP '"version":\s*"\K[^"]+' manifest.json)
 # XPI filename
 XPI_NAME="kokoro-tts-addon-v${VERSION}.xpi"
 
+# Build bundled content script
+echo "Building bundled content script with Rollup..."
+if [ -f "package.json" ]; then
+    npm run build
+else
+    echo "Warning: package.json not found, skipping bundle step"
+fi
+
 # Remove old XPI if exists
 rm -f *.xpi
 
@@ -17,7 +25,7 @@ echo "Building ${XPI_NAME}..."
 zip -r "${XPI_NAME}" \
     manifest.json \
     background.js \
-    content.js \
+    dist/content-bundle.js \
     popup.html \
     popup.js \
     player.html \

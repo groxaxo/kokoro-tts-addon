@@ -28,10 +28,15 @@ This guide provides step-by-step instructions for installing and configuring the
 
 #### Option B: Build from Source
 
+Building from source requires Node.js and npm to be installed.
+
 ```bash
 # Clone the repository
 git clone https://github.com/groxaxo/kokoro-tts-addon.git
 cd kokoro-tts-addon
+
+# Install npm dependencies (required for bundling)
+npm install
 
 # Build the XPI
 ./build-xpi.sh  # On Linux/macOS

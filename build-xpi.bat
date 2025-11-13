@@ -9,12 +9,20 @@ for /f "tokens=2 delims=:, " %%a in ('findstr /C:"\"version\"" manifest.json') d
 REM XPI filename
 set XPI_NAME=kokoro-tts-addon-v%VERSION%.xpi
 
+REM Build bundled content script
+echo Building bundled content script with Rollup...
+if exist package.json (
+    call npm run build
+) else (
+    echo Warning: package.json not found, skipping bundle step
+)
+
 REM Remove old XPI if exists
 if exist *.xpi del *.xpi
 
 REM Create XPI using PowerShell
 echo Building %XPI_NAME%...
-powershell -Command "Compress-Archive -Path manifest.json,background.js,content.js,popup.html,popup.js,player.html,player.js,styles.css,icons -DestinationPath %XPI_NAME%.zip -Force"
+powershell -Command "Compress-Archive -Path manifest.json,background.js,dist\content-bundle.js,popup.html,popup.js,player.html,player.js,styles.css,icons -DestinationPath %XPI_NAME%.zip -Force"
 ren %XPI_NAME%.zip %XPI_NAME%
 
 echo.
